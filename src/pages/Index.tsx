@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { ProductCard } from "@/components/ProductCard";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 
@@ -17,18 +18,24 @@ interface Product {
 const Index = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   useEffect(() => {
     loadProducts();
   }, []);
 
-  const loadProducts = async () => {
+  const loadProducts = async (category?: string) => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('products')
         .select('*')
-        .eq('available', true)
-        .order('created_at', { ascending: false });
+        .eq('available', true);
+      
+      if (category) {
+        query = query.eq('category', category);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
       
       if (error) throw error;
       setProducts(data || []);
@@ -37,6 +44,18 @@ const Index = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCategoryClick = (category: string) => {
+    setLoading(true);
+    setSelectedCategory(category);
+    loadProducts(category);
+  };
+
+  const handleShowAll = () => {
+    setLoading(true);
+    setSelectedCategory(null);
+    loadProducts();
   };
 
   return (
@@ -63,14 +82,33 @@ const Index = () => {
         {/* Categories Section */}
         <section className="py-12 bg-secondary/30">
           <div className="container mx-auto px-4">
+            <div className="flex justify-center mb-4">
+              <Button
+                variant={selectedCategory === null ? "default" : "outline"}
+                onClick={handleShowAll}
+                className="mr-2"
+              >
+                All Products
+              </Button>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {['Readymade', 'Abayas', 'Dress Materials', 'Handbags'].map((category) => (
+              {[
+                { label: 'Readymade', value: 'readymade' },
+                { label: 'Abayas', value: 'abayas' },
+                { label: 'Dress Materials', value: 'dress_materials' },
+                { label: 'Handbags', value: 'handbags' }
+              ].map((category) => (
                 <div
-                  key={category}
-                  className="aspect-square rounded-lg bg-card border border-border flex items-center justify-center hover:border-primary transition-colors cursor-pointer group"
+                  key={category.value}
+                  onClick={() => handleCategoryClick(category.value)}
+                  className={`aspect-square rounded-lg bg-card border ${
+                    selectedCategory === category.value ? 'border-primary' : 'border-border'
+                  } flex items-center justify-center hover:border-primary transition-colors cursor-pointer group`}
                 >
-                  <h3 className="text-lg font-serif font-semibold group-hover:text-primary transition-colors">
-                    {category}
+                  <h3 className={`text-lg font-serif font-semibold group-hover:text-primary transition-colors ${
+                    selectedCategory === category.value ? 'text-primary' : ''
+                  }`}>
+                    {category.label}
                   </h3>
                 </div>
               ))}

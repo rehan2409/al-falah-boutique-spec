@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, ShoppingCart } from "lucide-react";
+import { useCartStore } from "@/stores/cartStore";
+import { toast } from "sonner";
 
 interface Product {
   id: string;
@@ -19,10 +22,23 @@ const ProductDetail = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
+  const addItem = useCartStore((state) => state.addItem);
 
   useEffect(() => {
     loadProduct();
   }, [id]);
+
+  const handleAddToCart = () => {
+    if (product) {
+      addItem({
+        id: product.id,
+        title: product.title,
+        price: product.price,
+        image: product.images[0] || '/placeholder.svg',
+      });
+      toast.success("Added to cart!");
+    }
+  };
 
   const loadProduct = async () => {
     try {
@@ -130,12 +146,14 @@ const ProductDetail = () => {
               </p>
             </div>
 
-            <div className="bg-secondary/30 p-6 rounded-lg">
-              <h3 className="font-serif font-semibold mb-2">Contact Us to Purchase</h3>
-              <p className="text-sm text-muted-foreground">
-                Please contact us directly to place your order for this beautiful piece.
-              </p>
-            </div>
+            <Button 
+              size="lg" 
+              className="w-full"
+              onClick={handleAddToCart}
+            >
+              <ShoppingCart className="mr-2 h-5 w-5" />
+              Add to Cart
+            </Button>
           </div>
         </div>
       </main>

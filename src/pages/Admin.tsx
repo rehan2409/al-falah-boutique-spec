@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
-import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Trash2, Edit2 } from "lucide-react";
+import { Loader2, Trash2, Edit2, Lock } from "lucide-react";
+
+const ADMIN_PASSWORD = "alfalah2025";
 
 interface Product {
   id: string;
@@ -23,11 +24,12 @@ interface Product {
 }
 
 const Admin = () => {
-  const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
   
   // Form state
   const [title, setTitle] = useState("");
@@ -38,17 +40,26 @@ const Admin = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && (!user || !isAdmin)) {
-      toast.error("Access denied. Admin only.");
-      navigate("/");
-    }
-  }, [user, isAdmin, authLoading, navigate]);
-
-  useEffect(() => {
-    if (user && isAdmin) {
+    const savedAuth = sessionStorage.getItem('admin_authenticated');
+    if (savedAuth === 'true') {
+      setIsAuthenticated(true);
       loadProducts();
+    } else {
+      setLoading(false);
     }
-  }, [user, isAdmin]);
+  }, []);
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === ADMIN_PASSWORD) {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('admin_authenticated', 'true');
+      loadProducts();
+      toast.success("Access granted!");
+    } else {
+      toast.error("Incorrect password");
+    }
+  };
 
   const loadProducts = async () => {
     try {
@@ -141,7 +152,43 @@ const Admin = () => {
     setImageUrl("");
   };
 
-  if (authLoading || loading) {
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="flex justify-center items-center py-20">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5" />
+                Admin Access
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter admin password"
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full">
+                  Access Dashboard
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />

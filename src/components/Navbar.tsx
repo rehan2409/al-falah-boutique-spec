@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { LogOut, LayoutDashboard, User } from "lucide-react";
+import { CartDrawer } from "./CartDrawer";
 
 export const Navbar = () => {
   const { user, isAdmin } = useAuth();
@@ -28,6 +29,8 @@ export const Navbar = () => {
           <Link to="/" className="text-foreground hover:text-primary transition-colors">
             Home
           </Link>
+          
+          <CartDrawer />
           
           {user ? (
             <>

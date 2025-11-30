@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import ProductDetail from "./pages/ProductDetail";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import Checkout from "./pages/Checkout";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./hooks/useAuth";
 
@@ -30,6 +31,7 @@ const App = () => {
             <Route path="/product/:id" element={<ProductDetail />} />
             <Route path="/auth" element={user ? <Navigate to="/" /> : <Auth />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/checkout" element={<Checkout />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

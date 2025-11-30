@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,21 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCartStore } from "@/stores/cartStore";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageCircle, Mail } from "lucide-react";
+import { Download, Check } from "lucide-react";
+import jsPDF from "jspdf";
+
+interface Coupon {
+  id: string;
+  code: string;
+  discount_type: string;
+  discount_value: number;
+  min_purchase: number;
+  max_uses: number | null;
+  used_count: number;
+  expires_at: string | null;
+}
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -17,6 +30,158 @@ const Checkout = () => {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [paymentQRUrl, setPaymentQRUrl] = useState("");
+  const [orderCompleted, setOrderCompleted] = useState(false);
+
+  useEffect(() => {
+    loadPaymentQR();
+  }, []);
+
+  const loadPaymentQR = async () => {
+    const { data } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'payment_qr_url')
+      .maybeSingle();
+    
+    if (data) setPaymentQRUrl(data.value);
+  };
+
+  const calculateDiscount = () => {
+    if (!appliedCoupon) return 0;
+    
+    const total = getTotalPrice();
+    if (appliedCoupon.discount_type === 'percentage') {
+      return (total * appliedCoupon.discount_value) / 100;
+    } else {
+      return appliedCoupon.discount_value;
+    }
+  };
+
+  const getFinalTotal = () => {
+    return getTotalPrice() - calculateDiscount();
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error("Please enter a coupon code");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('code', couponCode.toUpperCase())
+        .eq('active', true)
+        .maybeSingle();
+
+      if (error || !data) {
+        toast.error("Invalid coupon code");
+        return;
+      }
+
+      const coupon = data as Coupon;
+
+      if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+        toast.error("This coupon has expired");
+        return;
+      }
+
+      if (coupon.max_uses && coupon.used_count >= coupon.max_uses) {
+        toast.error("This coupon has reached its maximum usage limit");
+        return;
+      }
+
+      if (getTotalPrice() < coupon.min_purchase) {
+        toast.error(`Minimum purchase of INR ${coupon.min_purchase} required`);
+        return;
+      }
+
+      setAppliedCoupon(coupon);
+      toast.success("Coupon applied successfully!");
+    } catch (error: any) {
+      toast.error("Failed to apply coupon");
+    }
+  };
+
+  const generateInvoicePDF = async () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    doc.setFontSize(20);
+    doc.text("Al Falah Boutique", pageWidth / 2, 20, { align: "center" });
+    doc.setFontSize(12);
+    doc.text("INVOICE", pageWidth / 2, 30, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.text(`Customer Name: ${name}`, 20, 45);
+    doc.text(`Phone: ${phone}`, 20, 52);
+    doc.text(`Address: ${address}`, 20, 59);
+    if (notes) doc.text(`Notes: ${notes}`, 20, 66);
+    
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, notes ? 73 : 66);
+    
+    const tableTop = notes ? 85 : 78;
+    doc.setFillColor(240, 240, 240);
+    doc.rect(20, tableTop, pageWidth - 40, 8, 'F');
+    doc.text("Item", 25, tableTop + 5);
+    doc.text("Qty", 120, tableTop + 5);
+    doc.text("Price", 145, tableTop + 5);
+    doc.text("Total", 170, tableTop + 5);
+    
+    let yPos = tableTop + 15;
+    items.forEach((item) => {
+      doc.text(item.title.substring(0, 30), 25, yPos);
+      doc.text(item.quantity.toString(), 120, yPos);
+      doc.text(`INR ${item.price.toFixed(2)}`, 145, yPos);
+      doc.text(`INR ${(item.price * item.quantity).toFixed(2)}`, 170, yPos);
+      yPos += 7;
+    });
+    
+    yPos += 10;
+    doc.text("Subtotal:", 120, yPos);
+    doc.text(`INR ${getTotalPrice().toFixed(2)}`, 170, yPos);
+    
+    if (appliedCoupon) {
+      yPos += 7;
+      doc.text(`Discount (${appliedCoupon.code}):`, 120, yPos);
+      doc.text(`-INR ${calculateDiscount().toFixed(2)}`, 170, yPos);
+    }
+    
+    yPos += 7;
+    doc.setFontSize(12);
+    doc.text("Grand Total:", 120, yPos);
+    doc.text(`INR ${getFinalTotal().toFixed(2)}`, 170, yPos);
+    
+    doc.setFontSize(10);
+    doc.text("Thank you for shopping with us!", pageWidth / 2, yPos + 20, { align: "center" });
+    
+    doc.save(`invoice-${Date.now()}.pdf`);
+  };
+
+  const handleCompleteOrder = async () => {
+    if (!name || !phone || !address) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    try {
+      if (appliedCoupon) {
+        await supabase
+          .from('coupons')
+          .update({ used_count: appliedCoupon.used_count + 1 })
+          .eq('id', appliedCoupon.id);
+      }
+
+      setOrderCompleted(true);
+      toast.success("Order placed successfully! Download your invoice below.");
+    } catch (error: any) {
+      toast.error("Failed to complete order");
+    }
+  };
 
   if (items.length === 0) {
     return (
@@ -31,47 +196,6 @@ const Checkout = () => {
     );
   }
 
-  const handleWhatsAppOrder = () => {
-    if (!name || !phone || !address) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
-    const orderDetails = items.map(item => 
-      `${item.quantity}x ${item.title} - INR ${(item.price * item.quantity).toFixed(2)}`
-    ).join('\n');
-    
-    const message = `*New Order from Al Falah Boutique*\n\n*Customer Details:*\nName: ${name}\nPhone: ${phone}\nAddress: ${address}\n${notes ? `Notes: ${notes}\n` : ''}\n*Order Items:*\n${orderDetails}\n\n*Total: INR ${getTotalPrice().toFixed(2)}*`;
-    
-    const whatsappUrl = `https://wa.me/919876543210?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
-    
-    clearCart();
-    toast.success("Order sent via WhatsApp! We'll contact you soon.");
-    navigate("/");
-  };
-
-  const handleEmailOrder = () => {
-    if (!name || !phone || !address) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
-    const orderDetails = items.map(item => 
-      `${item.quantity}x ${item.title} - INR ${(item.price * item.quantity).toFixed(2)}`
-    ).join('\n');
-    
-    const subject = 'New Order from Al Falah Boutique';
-    const body = `Customer Details:\nName: ${name}\nPhone: ${phone}\nAddress: ${address}\n${notes ? `Notes: ${notes}\n` : ''}\n\nOrder Items:\n${orderDetails}\n\nTotal: INR ${getTotalPrice().toFixed(2)}`;
-    
-    const mailtoUrl = `mailto:orders@alfalahboutique.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = mailtoUrl;
-    
-    clearCart();
-    toast.success("Opening your email client. Please send the email to complete your order.");
-    navigate("/");
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -80,118 +204,196 @@ const Checkout = () => {
         <h1 className="text-4xl font-serif font-bold mb-8">Checkout</h1>
 
         <div className="grid lg:grid-cols-2 gap-8">
-          {/* Order Form */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Delivery Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name *</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter your full name"
-                  required
-                />
-              </div>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Delivery Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name *</Label>
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter your full name"
+                    required
+                    disabled={orderCompleted}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number *</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Enter your phone number"
-                  required
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number *</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Enter your phone number"
+                    required
+                    disabled={orderCompleted}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="address">Delivery Address *</Label>
-                <Textarea
-                  id="address"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Enter your complete delivery address"
-                  rows={3}
-                  required
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Delivery Address *</Label>
+                  <Textarea
+                    id="address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Enter your complete delivery address"
+                    rows={3}
+                    required
+                    disabled={orderCompleted}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="notes">Order Notes (Optional)</Label>
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Any special instructions for your order"
-                  rows={2}
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Order Notes (Optional)</Label>
+                  <Textarea
+                    id="notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Any special instructions for your order"
+                    rows={2}
+                    disabled={orderCompleted}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
-              <div className="pt-4 space-y-3">
-                <Button 
-                  className="w-full" 
-                  size="lg"
-                  onClick={handleWhatsAppOrder}
-                >
-                  <MessageCircle className="mr-2 h-5 w-5" />
-                  Order via WhatsApp
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
-                  size="lg"
-                  onClick={handleEmailOrder}
-                >
-                  <Mail className="mr-2 h-5 w-5" />
-                  Order via Email
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            {paymentQRUrl && !orderCompleted && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment QR Code</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center gap-4">
+                  <img 
+                    src={paymentQRUrl} 
+                    alt="Payment QR Code" 
+                    className="w-64 h-64 object-contain border border-border rounded p-4"
+                  />
+                  <p className="text-sm text-muted-foreground text-center">
+                    Scan this QR code to make your payment
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
-          {/* Order Summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Order Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {items.map((item) => (
-                  <div key={item.id} className="flex gap-3 pb-4 border-b border-border">
-                    <img
-                      src={item.image}
-                      alt={item.title}
-                      className="w-16 h-16 object-cover rounded"
-                    />
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-sm">{item.title}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Quantity: {item.quantity}
-                      </p>
-                      <p className="text-sm font-medium">
-                        INR {(item.price * item.quantity).toFixed(2)}
-                      </p>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {items.map((item) => (
+                    <div key={item.id} className="flex gap-3 pb-4 border-b border-border">
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        className="w-16 h-16 object-cover rounded"
+                      />
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-sm">{item.title}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Quantity: {item.quantity}
+                        </p>
+                        <p className="text-sm font-medium">
+                          INR {(item.price * item.quantity).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {!orderCompleted && (
+                    <div className="space-y-2">
+                      <Label htmlFor="coupon">Have a coupon?</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="coupon"
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value)}
+                          placeholder="Enter coupon code"
+                          disabled={!!appliedCoupon}
+                        />
+                        <Button 
+                          onClick={handleApplyCoupon}
+                          disabled={!!appliedCoupon}
+                          variant="outline"
+                        >
+                          Apply
+                        </Button>
+                      </div>
+                      {appliedCoupon && (
+                        <div className="flex items-center gap-2 text-sm text-green-600">
+                          <Check className="h-4 w-4" />
+                          Coupon applied: {appliedCoupon.code}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="pt-4 space-y-2">
+                    <div className="flex justify-between text-base">
+                      <span>Subtotal:</span>
+                      <span>INR {getTotalPrice().toFixed(2)}</span>
+                    </div>
+                    
+                    {appliedCoupon && (
+                      <div className="flex justify-between text-base text-green-600">
+                        <span>Discount:</span>
+                        <span>-INR {calculateDiscount().toFixed(2)}</span>
+                      </div>
+                    )}
+                    
+                    <div className="flex justify-between text-lg font-semibold">
+                      <span>Total:</span>
+                      <span>INR {getFinalTotal().toFixed(2)}</span>
                     </div>
                   </div>
-                ))}
-                
-                <div className="pt-4 space-y-2">
-                  <div className="flex justify-between text-lg font-semibold">
-                    <span>Total:</span>
-                    <span>INR {getTotalPrice().toFixed(2)}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    * Payment on delivery
-                  </p>
                 </div>
+              </CardContent>
+            </Card>
+
+            {!orderCompleted ? (
+              <Button 
+                className="w-full" 
+                size="lg"
+                onClick={handleCompleteOrder}
+              >
+                Complete Order
+              </Button>
+            ) : (
+              <div className="space-y-3">
+                <Card className="bg-green-50 border-green-200">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2 text-green-700 mb-2">
+                      <Check className="h-5 w-5" />
+                      <p className="font-semibold">Order Placed Successfully!</p>
+                    </div>
+                    <p className="text-sm text-green-600">
+                      We will contact you soon for delivery confirmation.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={() => {
+                    generateInvoicePDF();
+                    clearCart();
+                    setTimeout(() => navigate("/"), 1000);
+                  }}
+                >
+                  <Download className="mr-2 h-5 w-5" />
+                  Download Invoice & Continue
+                </Button>
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </div>
         </div>
       </main>
     </div>

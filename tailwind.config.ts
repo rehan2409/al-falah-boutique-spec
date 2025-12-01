@@ -51,6 +51,8 @@ export default {
           hero: "hsl(var(--boutique-hero))",
           gold: "hsl(var(--boutique-gold))",
           cream: "hsl(var(--boutique-cream))",
+          "gradient-start": "hsl(var(--boutique-gradient-start))",
+          "gradient-end": "hsl(var(--boutique-gradient-end))",
         },
       },
       fontFamily: {

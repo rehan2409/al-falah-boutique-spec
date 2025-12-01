@@ -110,56 +110,110 @@ const Checkout = () => {
   const generateInvoicePDF = async () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     
-    doc.setFontSize(20);
+    // Header with gradient effect
+    doc.setFillColor(128, 90, 213);
+    doc.rect(0, 0, pageWidth, 45, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(28);
+    doc.setFont('helvetica', 'bold');
     doc.text("Al Falah Boutique", pageWidth / 2, 20, { align: "center" });
+    
     doc.setFontSize(12);
-    doc.text("INVOICE", pageWidth / 2, 30, { align: "center" });
+    doc.setFont('helvetica', 'normal');
+    doc.text("INVOICE / RECEIPT", pageWidth / 2, 32, { align: "center" });
     
+    // Reset text color
+    doc.setTextColor(0, 0, 0);
+    
+    // Customer details section
+    doc.setFillColor(245, 245, 250);
+    doc.rect(15, 55, pageWidth - 30, 40, 'F');
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Customer Information", 20, 64);
+    
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text(`Customer Name: ${name}`, 20, 45);
-    doc.text(`Phone: ${phone}`, 20, 52);
-    doc.text(`Address: ${address}`, 20, 59);
-    if (notes) doc.text(`Notes: ${notes}`, 20, 66);
+    doc.text(`Name: ${name}`, 20, 72);
+    doc.text(`Phone: ${phone}`, 20, 79);
+    doc.text(`Address: ${address}`, 20, 86);
     
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, notes ? 73 : 66);
+    doc.text(`Date: ${new Date().toLocaleDateString('en-IN')}`, pageWidth - 20, 72, { align: "right" });
+    doc.text(`Invoice #: ${Date.now().toString().slice(-8)}`, pageWidth - 20, 79, { align: "right" });
     
-    const tableTop = notes ? 85 : 78;
-    doc.setFillColor(240, 240, 240);
-    doc.rect(20, tableTop, pageWidth - 40, 8, 'F');
-    doc.text("Item", 25, tableTop + 5);
-    doc.text("Qty", 120, tableTop + 5);
-    doc.text("Price", 145, tableTop + 5);
-    doc.text("Total", 170, tableTop + 5);
+    // Table header
+    const tableTop = 105;
+    doc.setFillColor(128, 90, 213);
+    doc.rect(15, tableTop, pageWidth - 30, 10, 'F');
     
-    let yPos = tableTop + 15;
-    items.forEach((item) => {
-      doc.text(item.title.substring(0, 30), 25, yPos);
-      doc.text(item.quantity.toString(), 120, yPos);
-      doc.text(`INR ${item.price.toFixed(2)}`, 145, yPos);
-      doc.text(`INR ${(item.price * item.quantity).toFixed(2)}`, 170, yPos);
-      yPos += 7;
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text("ITEM", 20, tableTop + 7);
+    doc.text("QTY", 115, tableTop + 7);
+    doc.text("PRICE", 140, tableTop + 7);
+    doc.text("TOTAL", 170, tableTop + 7);
+    
+    // Table rows
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    let yPos = tableTop + 17;
+    
+    items.forEach((item, index) => {
+      if (index % 2 === 0) {
+        doc.setFillColor(250, 250, 252);
+        doc.rect(15, yPos - 5, pageWidth - 30, 9, 'F');
+      }
+      
+      const itemTitle = item.title.length > 40 ? item.title.substring(0, 37) + '...' : item.title;
+      doc.text(itemTitle, 20, yPos);
+      doc.text(item.quantity.toString(), 115, yPos);
+      doc.text(`₹${item.price.toFixed(2)}`, 140, yPos);
+      doc.text(`₹${(item.price * item.quantity).toFixed(2)}`, 170, yPos);
+      yPos += 9;
     });
     
+    // Summary section
     yPos += 10;
+    doc.setDrawColor(128, 90, 213);
+    doc.setLineWidth(0.5);
+    doc.line(120, yPos, pageWidth - 15, yPos);
+    
+    yPos += 8;
+    doc.setFontSize(10);
     doc.text("Subtotal:", 120, yPos);
-    doc.text(`INR ${getTotalPrice().toFixed(2)}`, 170, yPos);
+    doc.text(`₹${getTotalPrice().toFixed(2)}`, 170, yPos);
     
     if (appliedCoupon) {
       yPos += 7;
+      doc.setTextColor(34, 197, 94);
       doc.text(`Discount (${appliedCoupon.code}):`, 120, yPos);
-      doc.text(`-INR ${calculateDiscount().toFixed(2)}`, 170, yPos);
+      doc.text(`-₹${calculateDiscount().toFixed(2)}`, 170, yPos);
+      doc.setTextColor(0, 0, 0);
     }
     
-    yPos += 7;
+    yPos += 10;
+    doc.setFillColor(128, 90, 213);
+    doc.rect(115, yPos - 5, pageWidth - 130, 12, 'F');
+    
+    doc.setTextColor(255, 255, 255);
     doc.setFontSize(12);
-    doc.text("Grand Total:", 120, yPos);
-    doc.text(`INR ${getFinalTotal().toFixed(2)}`, 170, yPos);
+    doc.setFont('helvetica', 'bold');
+    doc.text("GRAND TOTAL:", 120, yPos + 3);
+    doc.text(`₹${getFinalTotal().toFixed(2)}`, 170, yPos + 3);
     
-    doc.setFontSize(10);
-    doc.text("Thank you for shopping with us!", pageWidth / 2, yPos + 20, { align: "center" });
+    // Footer
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.text("Thank you for shopping with Al Falah Boutique!", pageWidth / 2, pageHeight - 20, { align: "center" });
+    doc.text("For any queries, please contact us", pageWidth / 2, pageHeight - 13, { align: "center" });
     
-    doc.save(`invoice-${Date.now()}.pdf`);
+    doc.save(`AlFalahBoutique-Invoice-${Date.now()}.pdf`);
   };
 
   const handleCompleteOrder = async () => {
@@ -169,6 +223,27 @@ const Checkout = () => {
     }
 
     try {
+      // Save order to database
+      const orderData = {
+        customer_name: name,
+        customer_email: phone + "@order.com", // Using phone as identifier
+        customer_phone: phone,
+        customer_address: address,
+        items: items as any, // Convert to Json type
+        subtotal: getTotalPrice(),
+        discount: calculateDiscount(),
+        total: getFinalTotal(),
+        coupon_code: appliedCoupon?.code || null,
+        status: 'pending'
+      };
+
+      const { error: orderError } = await supabase
+        .from('orders')
+        .insert([orderData]);
+
+      if (orderError) throw orderError;
+
+      // Update coupon usage
       if (appliedCoupon) {
         await supabase
           .from('coupons')
@@ -179,6 +254,7 @@ const Checkout = () => {
       setOrderCompleted(true);
       toast.success("Order placed successfully! Download your invoice below.");
     } catch (error: any) {
+      console.error('Order error:', error);
       toast.error("Failed to complete order");
     }
   };

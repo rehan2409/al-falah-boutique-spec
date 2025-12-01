@@ -56,6 +56,54 @@ export type Database = {
         }
         Relationships: []
       }
+      orders: {
+        Row: {
+          coupon_code: string | null
+          created_at: string
+          customer_address: string
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          discount: number | null
+          id: string
+          items: Json
+          status: string
+          subtotal: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          coupon_code?: string | null
+          created_at?: string
+          customer_address: string
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          discount?: number | null
+          id?: string
+          items: Json
+          status?: string
+          subtotal: number
+          total: number
+          updated_at?: string
+        }
+        Update: {
+          coupon_code?: string | null
+          created_at?: string
+          customer_address?: string
+          customer_email?: string
+          customer_name?: string
+          customer_phone?: string
+          discount?: number | null
+          id?: string
+          items?: Json
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           available: boolean | null

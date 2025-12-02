@@ -463,9 +463,28 @@ const Admin = () => {
       console.log('Public URL:', qrUrl);
 
       console.log('Saving URL to settings table');
-      const { error: settingsError } = await supabase
+      // First try to update existing record
+      const { data: existingSettings } = await supabase
         .from('settings')
-        .upsert({ key: 'payment_qr_url', value: qrUrl });
+        .select('id')
+        .eq('key', 'payment_qr_url')
+        .maybeSingle();
+
+      let settingsError;
+      if (existingSettings) {
+        // Update existing record
+        const { error } = await supabase
+          .from('settings')
+          .update({ value: qrUrl, updated_at: new Date().toISOString() })
+          .eq('key', 'payment_qr_url');
+        settingsError = error;
+      } else {
+        // Insert new record
+        const { error } = await supabase
+          .from('settings')
+          .insert({ key: 'payment_qr_url', value: qrUrl });
+        settingsError = error;
+      }
 
       if (settingsError) {
         console.error('Settings save error:', settingsError);

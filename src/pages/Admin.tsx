@@ -286,27 +286,36 @@ const Admin = () => {
         active: true,
       };
 
+      console.log('Creating/updating coupon:', couponData);
+
       if (editingCouponId) {
         const { error } = await supabase
           .from('coupons')
           .update(couponData)
           .eq('id', editingCouponId);
         
-        if (error) throw error;
-        toast.success("Coupon updated successfully");
+        if (error) {
+          console.error('Error updating coupon:', error);
+          throw error;
+        }
+        toast.success("Coupon updated successfully!");
       } else {
         const { error } = await supabase
           .from('coupons')
           .insert([couponData]);
         
-        if (error) throw error;
-        toast.success("Coupon created successfully");
+        if (error) {
+          console.error('Error creating coupon:', error);
+          throw error;
+        }
+        toast.success("Coupon created successfully!");
       }
 
       resetCouponForm();
       loadCoupons();
     } catch (error: any) {
-      toast.error(error.message);
+      console.error('Coupon submit error:', error);
+      toast.error(error.message || "Failed to save coupon");
     } finally {
       setSaving(false);
     }
@@ -383,33 +392,49 @@ const Admin = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log('Starting QR upload:', file.name, file.type, file.size);
     setUploadingQR(true);
+    
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `payment-qr.${fileExt}`;
+
+      console.log('Uploading to storage bucket:', fileName);
 
       const { error: uploadError } = await supabase.storage
         .from('payment-qr')
         .upload(fileName, file, { upsert: true });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw uploadError;
+      }
+
+      console.log('File uploaded successfully, getting public URL');
 
       const { data } = supabase.storage
         .from('payment-qr')
         .getPublicUrl(fileName);
 
       const qrUrl = data.publicUrl;
+      console.log('Public URL:', qrUrl);
 
+      console.log('Saving URL to settings table');
       const { error: settingsError } = await supabase
         .from('settings')
         .upsert({ key: 'payment_qr_url', value: qrUrl });
 
-      if (settingsError) throw settingsError;
+      if (settingsError) {
+        console.error('Settings save error:', settingsError);
+        throw settingsError;
+      }
 
       setPaymentQRUrl(qrUrl);
-      toast.success("Payment QR code uploaded successfully");
+      toast.success("Payment QR code uploaded successfully!");
+      console.log('QR upload complete');
     } catch (error: any) {
-      toast.error(error.message);
+      console.error('QR upload failed:', error);
+      toast.error(error.message || "Failed to upload QR code");
     } finally {
       setUploadingQR(false);
     }

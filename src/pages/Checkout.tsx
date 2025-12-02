@@ -222,14 +222,16 @@ const Checkout = () => {
       return;
     }
 
+    console.log('Starting order submission...');
+    
     try {
       // Save order to database
       const orderData = {
         customer_name: name,
-        customer_email: phone + "@order.com", // Using phone as identifier
+        customer_email: phone + "@order.com",
         customer_phone: phone,
         customer_address: address,
-        items: items as any, // Convert to Json type
+        items: items as any,
         subtotal: getTotalPrice(),
         discount: calculateDiscount(),
         total: getFinalTotal(),
@@ -237,25 +239,39 @@ const Checkout = () => {
         status: 'pending'
       };
 
-      const { error: orderError } = await supabase
-        .from('orders')
-        .insert([orderData]);
+      console.log('Order data:', orderData);
 
-      if (orderError) throw orderError;
+      const { error: orderError, data: orderResult } = await supabase
+        .from('orders')
+        .insert([orderData])
+        .select();
+
+      if (orderError) {
+        console.error('Order insert error:', orderError);
+        throw orderError;
+      }
+
+      console.log('Order created:', orderResult);
 
       // Update coupon usage
       if (appliedCoupon) {
-        await supabase
+        console.log('Updating coupon usage...');
+        const { error: couponError } = await supabase
           .from('coupons')
           .update({ used_count: appliedCoupon.used_count + 1 })
           .eq('id', appliedCoupon.id);
+        
+        if (couponError) {
+          console.error('Coupon update error:', couponError);
+        }
       }
 
       setOrderCompleted(true);
       toast.success("Order placed successfully! Download your invoice below.");
+      console.log('Order completed successfully');
     } catch (error: any) {
       console.error('Order error:', error);
-      toast.error("Failed to complete order");
+      toast.error(error.message || "Failed to complete order. Please try again.");
     }
   };
 
@@ -338,20 +354,51 @@ const Checkout = () => {
               </CardContent>
             </Card>
 
-            {paymentQRUrl && !orderCompleted && (
-              <Card>
+            {!orderCompleted && (
+              <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5">
                 <CardHeader>
-                  <CardTitle>Payment QR Code</CardTitle>
+                  <CardTitle className="text-2xl flex items-center gap-2">
+                    <span className="text-3xl">💳</span>
+                    Payment Instructions
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="flex flex-col items-center gap-4">
-                  <img 
-                    src={paymentQRUrl} 
-                    alt="Payment QR Code" 
-                    className="w-64 h-64 object-contain border border-border rounded p-4"
-                  />
-                  <p className="text-sm text-muted-foreground text-center">
-                    Scan this QR code to make your payment
-                  </p>
+                <CardContent className="space-y-4">
+                  {paymentQRUrl ? (
+                    <>
+                      <div className="flex flex-col items-center gap-4 bg-white p-6 rounded-lg border-2 border-primary/30">
+                        <img 
+                          src={paymentQRUrl} 
+                          alt="Payment QR Code" 
+                          className="w-72 h-72 object-contain"
+                        />
+                        <div className="text-center space-y-2">
+                          <p className="font-semibold text-lg text-primary">
+                            Scan to Pay ₹{getFinalTotal().toFixed(2)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Scan this QR code using any UPI app to complete your payment
+                          </p>
+                        </div>
+                      </div>
+                      <div className="bg-boutique-cream/30 p-4 rounded-lg">
+                        <p className="text-sm font-medium mb-2">📱 Payment Steps:</p>
+                        <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                          <li>Open any UPI app (GPay, PhonePe, Paytm, etc.)</li>
+                          <li>Scan the QR code above</li>
+                          <li>Verify the amount: ₹{getFinalTotal().toFixed(2)}</li>
+                          <li>Complete the payment</li>
+                          <li>Click "Complete Order" below after payment</li>
+                        </ol>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-yellow-800 font-medium mb-2">⚠️ Payment QR Not Available</p>
+                      <p className="text-sm text-yellow-700">
+                        Please complete your order and we'll contact you with payment details
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

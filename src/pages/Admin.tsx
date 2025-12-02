@@ -375,13 +375,56 @@ const Admin = () => {
 
   const handleOrderStatus = async (orderId: string, status: string) => {
     try {
+      // Find the order to get customer details
+      const order = orders.find(o => o.id === orderId);
+      if (!order) {
+        toast.error("Order not found");
+        return;
+      }
+
       const { error } = await supabase
         .from('orders')
         .update({ status })
         .eq('id', orderId);
       
       if (error) throw error;
-      toast.success(`Order ${status}`);
+
+      // Send email notification
+      if (status === 'accepted' || status === 'rejected') {
+        try {
+          const items = Array.isArray(order.items) 
+            ? order.items.map((item: any) => ({
+                title: item.title || item.name || 'Product',
+                quantity: item.quantity || 1,
+                price: item.price || 0
+              }))
+            : [];
+
+          const { error: emailError } = await supabase.functions.invoke('send-order-email', {
+            body: {
+              customerName: order.customer_name,
+              customerEmail: order.customer_email,
+              orderId: order.id,
+              status: status as 'accepted' | 'rejected',
+              items,
+              total: order.total
+            }
+          });
+
+          if (emailError) {
+            console.error('Email error:', emailError);
+            toast.warning(`Order ${status}, but email notification failed`);
+          } else {
+            toast.success(`Order ${status} and customer notified via email`);
+          }
+        } catch (emailErr) {
+          console.error('Email sending error:', emailErr);
+          toast.warning(`Order ${status}, but email notification failed`);
+        }
+      } else {
+        toast.success(`Order ${status}`);
+      }
+
       loadOrders();
     } catch (error: any) {
       toast.error(error.message);

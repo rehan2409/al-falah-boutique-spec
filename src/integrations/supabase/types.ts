@@ -67,6 +67,7 @@ export type Database = {
           discount: number | null
           id: string
           items: Json
+          payment_screenshot: string | null
           status: string
           subtotal: number
           total: number
@@ -82,6 +83,7 @@ export type Database = {
           discount?: number | null
           id?: string
           items: Json
+          payment_screenshot?: string | null
           status?: string
           subtotal: number
           total: number
@@ -97,6 +99,7 @@ export type Database = {
           discount?: number | null
           id?: string
           items?: Json
+          payment_screenshot?: string | null
           status?: string
           subtotal?: number
           total?: number

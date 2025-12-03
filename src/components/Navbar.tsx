@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { LogOut, LayoutDashboard, User } from "lucide-react";
+import { LogOut, LayoutDashboard, User, Package } from "lucide-react";
 import { CartDrawer } from "./CartDrawer";
 
 export const Navbar = () => {
@@ -34,6 +34,12 @@ export const Navbar = () => {
           
           {user ? (
             <>
+              <Link to="/orders">
+                <Button variant="ghost" size="sm">
+                  <Package className="h-4 w-4 mr-2" />
+                  My Orders
+                </Button>
+              </Link>
               {isAdmin && (
                 <Link to="/admin">
                   <Button variant="outline" size="sm">

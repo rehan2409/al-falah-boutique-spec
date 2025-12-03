@@ -246,8 +246,8 @@ const Checkout = () => {
     doc.text("S.No", margin + 5, tableTop + 8);
     doc.text("Item Description", margin + 20, tableTop + 8);
     doc.text("Qty", 120, tableTop + 8);
-    doc.text("Rate (₹)", 140, tableTop + 8);
-    doc.text("Amount (₹)", 170, tableTop + 8);
+    doc.text("Rate (Rs.)", 138, tableTop + 8);
+    doc.text("Amount (Rs.)", 167, tableTop + 8);
     
     // Table rows
     doc.setTextColor(40, 40, 40);
@@ -285,14 +285,14 @@ const Checkout = () => {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text("Subtotal:", summaryX, yPos);
-    doc.text(`₹${getTotalPrice().toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 170, yPos);
+    doc.text(`Rs. ${getTotalPrice().toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 167, yPos);
     
     // Discount if applied
     if (appliedCoupon) {
       yPos += 8;
       doc.setTextColor(34, 139, 34);
       doc.text(`Discount (${appliedCoupon.code}):`, summaryX, yPos);
-      doc.text(`-₹${calculateDiscount().toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 170, yPos);
+      doc.text(`-Rs. ${calculateDiscount().toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 167, yPos);
       doc.setTextColor(40, 40, 40);
     }
     
@@ -305,7 +305,7 @@ const Checkout = () => {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text("GRAND TOTAL:", summaryX, yPos + 3);
-    doc.text(`₹${getFinalTotal().toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 170, yPos + 3);
+    doc.text(`Rs. ${getFinalTotal().toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 167, yPos + 3);
     
     // Payment Status
     yPos += 22;

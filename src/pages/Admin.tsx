@@ -50,6 +50,7 @@ interface Order {
   coupon_code: string | null;
   status: string;
   created_at: string;
+  payment_screenshot: string | null;
 }
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', 'hsl(var(--boutique-gold))', 'hsl(var(--secondary))'];
@@ -723,14 +724,14 @@ const Admin = () => {
                             </div>
                             <div>
                               <div className="space-y-1 mb-3">
-                                <p className="text-sm"><span className="font-medium">Subtotal:</span> ₹{order.subtotal.toFixed(2)}</p>
+                                <p className="text-sm"><span className="font-medium">Subtotal:</span> Rs. {order.subtotal.toFixed(2)}</p>
                                 {order.discount > 0 && (
                                   <p className="text-sm text-green-600">
-                                    <span className="font-medium">Discount:</span> -₹{order.discount.toFixed(2)}
+                                    <span className="font-medium">Discount:</span> -Rs. {order.discount.toFixed(2)}
                                     {order.coupon_code && ` (${order.coupon_code})`}
                                   </p>
                                 )}
-                                <p className="text-lg font-bold text-primary">Total: ₹{order.total.toFixed(2)}</p>
+                                <p className="text-lg font-bold text-primary">Total: Rs. {order.total.toFixed(2)}</p>
                               </div>
                               <div className="flex gap-2">
                                 {order.status === 'pending' && (
@@ -765,6 +766,26 @@ const Admin = () => {
                               </div>
                             </div>
                           </div>
+                          {/* Payment Screenshot */}
+                          {order.payment_screenshot && (
+                            <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                              <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                                📸 Payment Screenshot
+                              </p>
+                              <a 
+                                href={order.payment_screenshot} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="block"
+                              >
+                                <img 
+                                  src={order.payment_screenshot} 
+                                  alt="Payment proof" 
+                                  className="w-full max-w-xs h-auto rounded-lg border-2 border-primary/20 hover:border-primary transition-colors cursor-pointer"
+                                />
+                              </a>
+                            </div>
+                          )}
                           <details className="mt-4">
                             <summary className="cursor-pointer text-sm font-medium text-primary hover:underline">
                               View Items
@@ -773,7 +794,7 @@ const Admin = () => {
                               {Array.isArray(order.items) && order.items.map((item: any, idx: number) => (
                                 <div key={idx} className="flex justify-between text-sm border-t pt-2">
                                   <span>{item.title} x{item.quantity}</span>
-                                  <span className="font-medium">₹{(item.price * item.quantity).toFixed(2)}</span>
+                                  <span className="font-medium">Rs. {(item.price * item.quantity).toFixed(2)}</span>
                                 </div>
                               ))}
                             </div>
